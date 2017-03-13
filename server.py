@@ -23,13 +23,13 @@ def add_token(documents):
                                     for x in range(10)))
 
 def filter_hero_image(heroImage):
-    if 'image' in heroImage: 
+    if 'image' in heroImage:
         image = filter_gcs_info(heroImage['image'])
         heroImage['image'] = image
     return heroImage
 
 def filter_leading_video(leadingVideo):
-    if 'video' in leadingVideo: 
+    if 'video' in leadingVideo:
         video = filter_gcs_info(leadingVideo['video'])
         leadingVideo['video'] = video
     return leadingVideo
@@ -41,7 +41,7 @@ def filter_gcs_info(gcsObj):
       del gcsObj['gcsBucket']
     if 'filename' in gcsObj:
       del gcsObj['filename']
-    return gcsObj 
+    return gcsObj
 
 def get_relateds(item, key):
     if key in item and item[key]:
@@ -51,7 +51,7 @@ def get_relateds(item, key):
         resp = tc.get('meta?where={"_id":{"$in":[' + all_relateds + ']}}', headers=headers)
         resp_data = json.loads(resp.get_data().decode())
         result = []
-        for i in item[key]: 
+        for i in item[key]:
             for j in resp_data['_items']:
                 if j['_id'] == str(i):
                     result.append(j)
@@ -78,6 +78,21 @@ def get_topic(topic_id):
   resp_data = json.loads(resp.get_data().decode())
   return resp_data
 
+def image_adder(key, item):
+  if key in item and item[key]:
+      for obj in item[key]:
+          try:
+              if 'image' in obj and obj['image']:
+                  query = str(obj['image'])
+                  headers = dict(request.headers)
+                  tc = app.test_client()
+                  resp = tc.get('images?where={"_id":{"$in":['+ '"' + query + '"' + ']}}', headers=headers)
+                  response = json.loads(resp.get_data().decode())
+                  obj['image'] = response['_items'][0]['image']
+          except:
+              print 'Error, image maping occurs error'
+              print type(obj)
+
 def filter_post(item):
   if 'brief' in item:
     del item['brief']['draft']
@@ -91,6 +106,8 @@ def filter_post(item):
   if 'leading_video' in item:
     if type(item['leading_video']) is dict:
       item['leading_video'] = filter_leading_video(item['leading_video'])
+  for x in ['engineers', 'writters', 'designers', 'photographers']:
+      image_adder(x, item)
   return item
 
 def before_returning_posts(response):
@@ -104,7 +121,7 @@ def before_returning_post(response):
   # check if topic object is to be embedded
   topics = str(request.args.get('embedded')).find('topics')
 
-  if topics > -1 and 'topics' in item: 
+  if topics > -1 and 'topics' in item:
     item['topics'] = get_topic(item['topics'])
   return item
 
@@ -113,7 +130,7 @@ def filter_topics(items):
         item = filter_topic(item)
     return items
 
-def filter_topic(item): 
+def filter_topic(item):
     if 'description' in item:
       del item['description']['draft']
       del item['description']['apiData']
@@ -131,7 +148,7 @@ def filter_topic(item):
         item['leading_video'] = filter_leading_video(item['leading_video'])
     return item
 
-def before_returing_topics(response): 
+def before_returing_topics(response):
     items = response['_items']
     for item in items:
         item = before_returning_topic(item)
@@ -149,6 +166,7 @@ app.on_fetched_resource_posts += before_returning_posts
 app.on_fetched_item_posts += before_returning_post
 app.on_fetched_resource_topics += before_returing_topics
 app.on_fetched_item_topics += before_returning_topic
+
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=8080, threaded=True, debug=True)
